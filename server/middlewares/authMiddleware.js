@@ -1,3 +1,7 @@
+/**
+ * Authentication middleware to verify JWT token from Authorization header.
+ * Adds userId to request body if token is valid.
+ */
 const jwt = require("jsonwebtoken");
 
 module.exports = function (req, res, next) {
