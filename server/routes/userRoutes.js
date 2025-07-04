@@ -5,64 +5,62 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const authMiddleware = require("../middlewares/authMiddleware");
 
+
+// Register a new user
 router.post("/register", async (req, res) => {
   try {
-    // check if the user already exists
+    // Check if the user already exists
     const userExists = await User.findOne({ email: req.body.email });
+
     if (userExists) {
-      res.send({
+      return res.send({
         success: false,
-        message: "The user already exists!",
+        message: "User already exists!",
       });
     }
 
-    // if not create the user according to the User Model
-
-    // hashing and salting
-
+    // Generate salt and hash the password
     const salt = await bcrypt.genSalt(10);
-    console.log(salt);
     const hashedPassword = bcrypt.hashSync(req.body.password, salt);
-
     req.body.password = hashedPassword;
 
-    // console.log(password fixed)
-    const newUser = await User(req.body);
+    const newUser = new User(req.body);
     await newUser.save();
 
     res.send({
       success: true,
-      message: "User Resgitered Successfully",
+      message: "User registered successfully!",
     });
+
   } catch (err) {
-    console.log(err);
+    console.error("Registration error:", err);
+    res.send({
+      success: false,
+      message: "Something went wrong during registration."
+    });
   }
 });
 
+
+// Login an existing user
 router.post("/login", async (req, res) => {
   try {
     const user = await User.findOne({ email: req.body.email });
 
-    console.log(user);
-
     if (!user) {
-      res.send({
+      return res.send({
         success: false,
-        message: "user does not exist Please Register",
+        message: "User does not exist. Please register first.",
       });
     }
 
-    // validate password
-
-    const validPassword = await bcrypt.compare(
-      req.body.password,
-      user.password
-    );
+    // Validate password
+    const validPassword = await bcrypt.compare(req.body.password, user.password);
 
     if (!validPassword) {
-      res.status(401).send({
+      return res.status(401).send({
         success: false,
-        message: "Sorry, invalid password entered!",
+        message: "Invalid password entered!",
       });
     }
 
@@ -72,22 +70,38 @@ router.post("/login", async (req, res) => {
 
     res.send({
       success: true,
-      message: "You've successfully logged in!",
+      message: "Login successful!",
       token: jwtToken,
     });
+
   } catch (error) {
-    console.error(error);
+    console.error("Login error:", error);
+    res.send({
+      success: false,
+      message: "Something went wrong during login."
+    });
   }
 });
 
-router.get("/get-valid-user", authMiddleware, async (req, res) => {
-  const validUser = await User.findById(req.body.userId).select("-password");
 
-  res.send({
-    success: true,
-    message: "You are authorized to go to the protected route!",
-    data: validUser,
-  });
+// Get currently authenticated user
+router.get("/get-valid-user", authMiddleware, async (req, res) => {
+  try {
+    const validUser = await User.findById(req.body.userId).select("-password");
+
+    res.send({
+      success: true,
+      message: "Authorized user fetched successfully!",
+      data: validUser,
+    });
+
+  } catch (error) {
+    console.error("Fetch user error:", error);
+    res.send({
+      success: false,
+      message: "Failed to fetch user."
+    });
+  }
 });
 
 module.exports = router;
