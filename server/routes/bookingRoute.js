@@ -1,40 +1,32 @@
 const router = require('express').Router();
 const stripe = require('stripe');
 
-
 const authMiddleware = require("../middlewares/authMiddleware");
 const Booking = require('../models/bookingModel');
 const Show = require('../models/showModel');
 
-router.post('/make-payment',  async (req, res) => {
-    try{
-        const {token, amount} = req.body;
-         console.log(token , amount)
+// Route for making payment
+router.post('/make-payment', async (req, res) => {
+    try {
+        const { token, amount } = req.body;
+
+        console.log(token, amount);
+
         const customer = await stripe.customers.create({
             email: token.email,
             source: token.id
         });
 
- // Verify the payment
+        // Create a payment intent
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: amount, // 500
+            amount: amount,
             currency: 'usd',
-            customer: customer.id, //cus_S4LZktNcXOOFvx
+            customer: customer.id,
             payment_method_types: ['card'],
             receipt_email: token.email,
             description: "Token has been assigned to the movie!"
         });
 
-       
-
-        // const charge = await stripe.charges.create({
-        //     amount: amount,
-        //     currency: "usd",
-        //     customer: customer.id,
-        //     receipt_email: token.email,
-        //     description: "Token has been assigned to the movie!"
-        // });
-        
         const transactionId = paymentIntent.id;
 
         res.send({
@@ -42,29 +34,37 @@ router.post('/make-payment',  async (req, res) => {
             message: "Payment Successful! Ticket(s) booked!",
             data: transactionId
         });
-    }catch(err){
+
+    } catch (err) {
         res.send({
             success: false,
             message: err.message
-        })
+        });
     }
 });
 
-// Create a booking after the payment
-router.post('/book-show',  async (req, res) => {
-    try{
+
+// Route to create booking after successful payment
+router.post('/book-show', async (req, res) => {
+    try {
         const newBooking = new Booking(req.body);
         await newBooking.save();
 
         const show = await Show.findById(req.body.show).populate("movie");
+
         const updatedBookedSeats = [...show.bookedSeats, ...req.body.seats];
-        await Show.findByIdAndUpdate(req.body.show, { bookedSeats: updatedBookedSeats });
+
+        await Show.findByIdAndUpdate(req.body.show, {
+            bookedSeats: updatedBookedSeats
+        });
+
         res.send({
             success: true,
             message: 'New Booking done!',
             data: newBooking
         });
-    }catch(err){
+
+    } catch (err) {
         res.send({
             success: false,
             message: err.message
@@ -73,11 +73,12 @@ router.post('/book-show',  async (req, res) => {
 });
 
 
-router.get("/get-all-bookings",authMiddleware, async (req, res) => {
-    try{
+// Get all bookings for a user
+router.get("/get-all-bookings", authMiddleware, async (req, res) => {
+    try {
         const bookings = await Booking.find({ user: req.body.userId })
-        .populate("user")
-        .populate("show")
+            .populate("user")
+            .populate("show")
             .populate({
                 path: "show",
                 populate: {
@@ -92,21 +93,19 @@ router.get("/get-all-bookings",authMiddleware, async (req, res) => {
                     model: "theatres"
                 }
             });
-        
+
         res.send({
             success: true,
             message: "Bookings fetched!",
             data: bookings
-        })
+        });
 
-    }catch(err){
+    } catch (err) {
         res.send({
             success: false,
             message: err.message
-        })
+        });
     }
 });
-
-
 
 module.exports = router;
